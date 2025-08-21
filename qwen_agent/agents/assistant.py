@@ -67,8 +67,12 @@ def format_knowledge_to_source_and_content(result: Union[str, List[dict]]) -> Li
         for doc in docs:
             url, snippets = doc['url'], doc['text']
             assert isinstance(snippets, list)
+            # _tmp_knowledge.append({
+            #     'source': f'[文件]({get_basename_from_url(url)})', #TODO 非绝对路径可能有问题
+            #     'content': '\n\n...\n\n'.join(snippets)
+            # })
             _tmp_knowledge.append({
-                'source': f'[文件]({get_basename_from_url(url)})',
+                'source': f'[文件]({url})', #TODO 非绝对路径可能有问题
                 'content': '\n\n...\n\n'.join(snippets)
             })
         knowledge.extend(_tmp_knowledge)

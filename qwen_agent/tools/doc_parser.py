@@ -103,6 +103,15 @@ class DocParser(BaseTool):
 
         url = params['url']
 
+        # 如果传入的是文件名或相对路径
+        if not url.startwith(('http://', 'https://')) and not os.path.isabs(url):
+            if os.path.exists(url):
+                url = os.path.abspath(url)
+            elif os.path.exists(os.path.join(DEFAULT_WORKSPACE, url)):
+                url = os.path.abspath(os.path.join(DEFAULT_WORKSPACE, url))
+            elif os.path.exists(os.path.join(self.data_root, url)):
+                url = os.path.abspath(os.path.join(self.data_root, url))
+                
         cached_name_chunking = f'{hash_sha256(url)}_{str(parser_page_size)}'
         try:
             # Directly load the chunked doc

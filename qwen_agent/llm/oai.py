@@ -50,6 +50,7 @@ class TextChatAtOAI(BaseFnCallModel):
         api_key = api_key or os.getenv('OPENAI_API_KEY')
         api_key = (api_key or 'EMPTY').strip()
 
+        api_headers = cfg.get('headers')
         if openai.__version__.startswith('0.'):
             if api_base:
                 openai.api_base = api_base
@@ -63,7 +64,8 @@ class TextChatAtOAI(BaseFnCallModel):
                 api_kwargs['base_url'] = api_base
             if api_key:
                 api_kwargs['api_key'] = api_key
-
+            if api_headers:
+                api_kwargs['default_headers'] = api_headers
             def _chat_complete_create(*args, **kwargs):
                 # OpenAI API v1 does not allow the following args, must pass by extra_body
                 extra_params = ['top_k', 'repetition_penalty']
