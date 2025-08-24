@@ -5,6 +5,7 @@ from qwen_agent.agents import Assistant
 
 from qwen_agent.gui import WebUI
 
+
 def get_files_from_folder(folder_path: str) -> List [str]:
     supporter_extensions = ['.pdf', '.docx', '.pptx', '.txt', '.csv', '.tsv', '.xlsx', '.xls', '.html']
     files = []
@@ -49,30 +50,36 @@ def create_folder_rag_agent(folder_path: str):
     bot = Assistant(
         llm=llm_cfg,
         name='RAG智能助手',
-        system_message='你是一个能够基于文件内容回答问题的助手。请根据提供的文件内容来回答用户问题，在根据文件内容回答问题时标注信息来源的文档。',
-        function_list=['retrieval'],
+        system_message='你是一个能够基于文件内容回答问题的助手。请根据提供的文件内容来回答用户问题，在根据文件内容回答问题时标注信息来源的文档和位置。当用户有涉及数据分析和表示的需求时，你可以根据用户的要求和参考信息中的有关数据使用Python语言和matplotlib库生成代码，并执行它来进行呈现。',
+        function_list=[
+            {
+                'name': 'retrieval',
+            },
+            'multimodal_doc_parser', 'code_interpreter'
+        ],
         files=files,
     )
     return bot
 
 def test_folder_rag_agent():
-    folder_path = "./example/resource" # 可以根据需要修改为其他文件夹路径
+    folder_path = "C:\\Qwen-Agent\\documents" # 可以根据需要修改为其他文件夹路径
     try:
         bot = create_folder_rag_agent(folder_path)
 
         messages = [{
             'role': 'user',
-            'content': '从文档中提取关键信息'
+            'content': '帮我分析下量子计算机发展的路线，并画一张折线图。'
         }]
         
         response = []
         for response in bot.run(messages):
+            # import pdb; pdb.set_trace()
             print('bot response:', response)
     except FileNotFoundError as e:
         print(f"Error: {e}")
 
 def app_gui():
-    folder_path = "./example/resource"  # 可以根据需要修改为其他文件夹路径
+    folder_path = "C:\\Qwen-Agent\\documents"  # 可以根据需要修改为其他文件夹路径
     try:
         bot = create_folder_rag_agent(folder_path)
 

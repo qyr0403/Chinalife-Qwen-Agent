@@ -54,7 +54,6 @@ def get_chat_model(cfg: Union[dict, str] = 'qwen-plus') -> BaseChatModel:
     """
     if isinstance(cfg, str):
         cfg = {'model': cfg}
-
     if 'model_type' in cfg:
         model_type = cfg['model_type']
         if model_type in LLM_REGISTRY:

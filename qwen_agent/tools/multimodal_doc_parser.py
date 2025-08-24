@@ -20,6 +20,7 @@ from typing import Dict, List, Optional, Union
 
 from pydantic import BaseModel
 
+from qwen_agent.llm import get_chat_model
 from qwen_agent.log import logger
 from qwen_agent.settings import DEFAULT_MAX_REF_TOKEN, DEFAULT_PARSER_PAGE_SIZE, DEFAULT_WORKSPACE
 from qwen_agent.tools.base import BaseTool, register_tool
@@ -53,8 +54,8 @@ class Record(BaseModel):
         return {'url': self.url, 'raw': [x.to_dict() for x in self.raw], 'title': self.title}
 
 
-@register_tool('doc_parser')
-class DocParser(BaseTool):
+@register_tool('multimodal_doc_parser')
+class MultimodalDocParser(BaseTool):
     description = '对一个文件进行内容提取和分块、返回分块后的文件内容'
     parameters = {
         'type': 'object',
@@ -69,6 +70,24 @@ class DocParser(BaseTool):
 
     def __init__(self, cfg: Optional[Dict] = None):
         super().__init__(cfg)
+        llm_cfg = {
+            # Use the model service provided by DashScope:
+            # 'model': 'qwen-max-latest',
+            # 'model_type': 'qwen_dashscope',
+            # 'api_key': 'YOUR_DASHSCOPE_API_KEY',
+            # It will use the `DASHSCOPE_API_KEY' environment variable if 'api_key' is not set here.
+
+            # Use a model service compatible with the OpenAI API, such as vLLM or Ollama:
+            'model': 'deepseek-chat',
+            'model_server': 'https://api.deepseek.com',  # base_url, also known as api_base
+            'api_key': 'sk-3c0a4836554f4261b7b964de3c5d02e3',
+
+            # (Optional) LLM hyperparameters for generation:
+            'generate_cfg': {
+                'top_p': 0.8
+            }
+        }
+        self.llm = get_chat_model(llm_cfg)
         self.max_ref_token: int = self.cfg.get('max_ref_token', DEFAULT_MAX_REF_TOKEN)
         self.parser_page_size: int = self.cfg.get('parser_page_size', DEFAULT_PARSER_PAGE_SIZE)
 
@@ -134,7 +153,7 @@ class DocParser(BaseTool):
 
         logger.info(f'Start chunking {url} ({title})...')
         time1 = time.time()
-        if total_token <= parser_page_size:
+        if total_token <= max_ref_token:
             # The whole doc is one chunk
             content = [
                 Chunk(content=get_plain_doc(doc),

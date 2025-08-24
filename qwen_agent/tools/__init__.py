@@ -18,6 +18,7 @@ from .code_interpreter import CodeInterpreter
 from .doc_parser import DocParser
 from .extract_doc_vocabulary import ExtractDocVocabulary
 from .image_gen import ImageGen
+from .multimodal_doc_parser import MultimodalDocParser
 from .python_executor import PythonExecutor
 from .retrieval import Retrieval
 from .search_tools import FrontPageSearch, HybridSearch, KeywordSearch, VectorSearch
@@ -29,6 +30,7 @@ from .web_search import WebSearch
 
 __all__ = [
     'BaseTool',
+    'MultimodalDocParser'
     'CodeInterpreter',
     'ImageGen',
     'AmapWeather',
