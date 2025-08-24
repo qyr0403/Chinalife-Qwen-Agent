@@ -12,9 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import atexit
 import os
 import base64
 import os
+import subprocess
+import sys
+import time
 import uuid
 import pprint
 import re
@@ -82,9 +86,12 @@ llm_cfg = {
     # It will use the `DASHSCOPE_API_KEY' environment variable if 'api_key' is not set here.
 
     # Use a model service compatible with the OpenAI API, such as vLLM or Ollama:
-    'model': 'kimi-k2-0711-preview',
-    'model_server': 'https://api.moonshot.cn/v1',  # base_url, also known as api_base
-    'api_key': 'sk-HwfDyinhIU1l4lBlcNTNq87jOESwyfTGNBz7Ysp1qakcKOWw',
+    # 'model': 'kimi-k2-0711-preview',
+    # 'model_server': 'https://api.moonshot.cn/v1',  # base_url, also known as api_base
+    # 'api_key': 'sk-HwfDyinhIU1l4lBlcNTNq87jOESwyfTGNBz7Ysp1qakcKOWw',
+    'model': 'deepseek-chat',
+    'model_server': 'https://api.deepseek.com',  # base_url, also known as api_base
+    'api_key': 'sk-3c0a4836554f4261b7b964de3c5d02e3',
 
     # (Optional) LLM hyperparameters for generation:
     'generate_cfg': {
@@ -99,7 +106,7 @@ bot = Assistant(
             {
                 'name': 'retrieval',
             },
-            # 'multimodal_doc_parser', 'code_interpreter'
+            'code_interpreter'
         ],
     files=files,
 )
@@ -771,234 +778,87 @@ with gr.Blocks(css=css, fill_width=True) as demo:
                  cancels=[submit_event, regenerating_event],
                  queue=False)
 
-if __name__ == "__main__":
-    demo.queue().launch(ssr_mode=False)
+
+static_server_process = None
+
+def start_static_server():
+    """启动静态文件服务器以服务 code_interpreter 生成的图片"""
+    global static_server_process
+    try:
+        # 1. 获取 code_interpreter 的实际工作目录
+
+        work_dir = r'D:\PROJECT\Chinalife-Qwen-Agent\workspace\tools\code_interpreter'
+        os.makedirs(work_dir, exist_ok=True)  # 确保目录存在
+        port = 8000  # 选择一个 Gradio 不会使用的端口
+        print(f"[INFO] Starting static file server for directory: {work_dir} on port {port}")
+
+        # 2. 构建命令
+        # 使用 sys.executable 确保使用当前 Python 环境
+        cmd = [sys.executable, '-m', 'http.server', str(port), '--directory', work_dir]
+        print(f"[DEBUG] Static server command: {' '.join(cmd)}")
+
+        # 3. 启动子进程
+        # cwd=work_dir 设置工作目录,
+        # stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL 隐藏输出
+        # 如果需要调试，可以注释掉 DEVNULL 部分
+        static_server_process = subprocess.Popen(
+            cmd,
+            cwd=work_dir,
+            stdout=subprocess.DEVNULL,  # subprocess.PIPE for debugging
+            stderr=subprocess.DEVNULL,  # subprocess.PIPE for debugging
+        )
+
+        # 4. 简单等待服务器启动
+        time.sleep(1)
+        if static_server_process.poll() is not None:  # 如果进程已经结束
+             print(f"[ERROR] Static server failed to start. Return code: {static_server_process.returncode}")
+             # 可以尝试读取 stderr 来获取错误信息 (如果没用 DEVNULL)
+             # stderr_output = static_server_process.stderr.read() if static_server_process.stderr else b''
+             # print(f"[ERROR] Static server error output: {stderr_output.decode()}")
+             static_server_process = None
+             return
+
+        print(f"[INFO] Static file server started (PID: {static_server_process.pid}).")
+
+        # 5. 设置环境变量供 code_interpreter 使用
+        static_url = f"http://localhost:{port}"
+        os.environ['M6_CODE_INTERPRETER_STATIC_URL'] = static_url
+        print(f"[INFO] Set M6_CODE_INTERPRETER_STATIC_URL={static_url}")
+
+    except Exception as e:
+        print(f"[ERROR] Failed to start static file server: {e}")
+        import traceback
+        traceback.print_exc()
+        static_server_process = None
 
 
-
-
-
-class WebUI:
-    """A Common chatbot application for agent."""
-
-    def __init__(self, agent: Union[Agent, MultiAgentHub, List[Agent]], chatbot_config: Optional[dict] = None):
-        """
-        Initialization the chatbot.
-
-        Args:
-            agent: The agent or a list of agents,
-                supports various types of agents such as Assistant, GroupChat, Router, etc.
-            chatbot_config: The chatbot configuration.
-                Set the configuration as {'user.name': '', 'user.avatar': '', 'agent.avatar': '', 'input.placeholder': '', 'prompt.suggestions': []}.
-        """
-        chatbot_config = chatbot_config or {}
-
-        if isinstance(agent, MultiAgentHub):
-            self.agent_list = [agent for agent in agent.nonuser_agents]
-            self.agent_hub = agent
-        elif isinstance(agent, list):
-            self.agent_list = agent
-            self.agent_hub = None
-        else:
-            self.agent_list = [agent]
-            self.agent_hub = None
-
-        user_name = chatbot_config.get('user.name', 'user')
-        self.user_config = {
-            'name': user_name,
-            'avatar': chatbot_config.get(
-                'user.avatar',
-                get_avatar_image(user_name),
-            ),
-        }
-
-        self.agent_config_list = [{
-            'name': agent.name,
-            'avatar': chatbot_config.get(
-                'agent.avatar',
-                get_avatar_image(agent.name),
-            ),
-            'description': agent.description or "I'm a helpful assistant.",
-        } for agent in self.agent_list]
-
-        self.input_placeholder = chatbot_config.get('input.placeholder', '跟我聊聊吧～')
-        self.prompt_suggestions = chatbot_config.get('prompt.suggestions', [])
-        self.verbose = chatbot_config.get('verbose', False)
-
-    """
-    Run the chatbot.
-
-    Args:
-        messages: The chat history.
-    """
-
-    def run(self,
-            messages: List[Message] = None,
-            share: bool = False,
-            server_name: str = None,
-            server_port: int = None,
-            concurrency_limit: int = 10,
-            enable_mention: bool = False,
-            **kwargs):
-        self.run_kwargs = kwargs 
-
-        
-    def add_text(self, _input, _audio_input, _chatbot, _history):
-        _history.append({
-            ROLE: USER,
-            CONTENT: [{
-                'text': _input.text
-            }],
-        })
-
-        if self.user_config[NAME]:
-            _history[-1][NAME] = self.user_config[NAME]
-        
-        # if got audio from microphone, append it to the multimodal inputs
-        if _audio_input:
-            from qwen_agent.gui.gradio_dep import gr, mgr, ms
-            audio_input_file = gr.data_classes.FileData(path=_audio_input, mime_type="audio/wav")
-            _input.files.append(audio_input_file)
-
-        if _input.files:
-            for file in _input.files:
-                if file.mime_type.startswith('image/'):
-                    _history[-1][CONTENT].append({IMAGE: 'file://' + file.path})
-                elif file.mime_type.startswith('audio/'):
-                    _history[-1][CONTENT].append({AUDIO: 'file://' + file.path})
-                elif file.mime_type.startswith('video/'):
-                    _history[-1][CONTENT].append({VIDEO: 'file://' + file.path})
-                else:
-                    _history[-1][CONTENT].append({FILE: file.path})
-
-        _chatbot.append([_input, None])
-
-        from qwen_agent.gui.gradio_dep import gr
-
-        yield gr.update(interactive=False, value=None), None, _chatbot, _history
-
-    def add_mention(self, _chatbot, _agent_selector):
-        if len(self.agent_list) == 1:
-            yield _chatbot, _agent_selector
-
-        query = _chatbot[-1][0].text
-        match = re.search(r'@\w+\b', query)
-        if match:
-            _agent_selector = self._get_agent_index_by_name(match.group()[1:])
-
-        agent_name = self.agent_list[_agent_selector].name
-
-        if ('@' + agent_name) not in query and self.agent_hub is None:
-            _chatbot[-1][0].text = '@' + agent_name + ' ' + query
-
-        yield _chatbot, _agent_selector
-
-    def agent_run(self, _chatbot, _history, _agent_selector=None):
-        if self.verbose:
-            logger.info('agent_run input:\n' + pprint.pformat(_history, indent=2))
-
-        num_input_bubbles = len(_chatbot) - 1
-        num_output_bubbles = 1
-        _chatbot[-1][1] = [None for _ in range(len(self.agent_list))]
-
-        agent_runner = self.agent_list[_agent_selector or 0]
-        if self.agent_hub:
-            agent_runner = self.agent_hub
-        responses = []
-        for responses in agent_runner.run(_history, **self.run_kwargs):
-            if not responses:
-                continue
-            if responses[-1][CONTENT] == PENDING_USER_INPUT:
-                logger.info('Interrupted. Waiting for user input!')
-                break
-
-            display_responses = convert_fncall_to_text(responses)
-            if not display_responses:
-                continue
-            if display_responses[-1][CONTENT] is None:
-                continue
-
-            while len(display_responses) > num_output_bubbles:
-                # Create a new chat bubble
-                _chatbot.append([None, None])
-                _chatbot[-1][1] = [None for _ in range(len(self.agent_list))]
-                num_output_bubbles += 1
-
-            assert num_output_bubbles == len(display_responses)
-            assert num_input_bubbles + num_output_bubbles == len(_chatbot)
-
-            for i, rsp in enumerate(display_responses):
-                agent_index = self._get_agent_index_by_name(rsp[NAME])
-                _chatbot[num_input_bubbles + i][1][agent_index] = rsp[CONTENT]
-
-            if len(self.agent_list) > 1:
-                _agent_selector = agent_index
-
-            if _agent_selector is not None:
-                yield _chatbot, _history, _agent_selector
-            else:
-                yield _chatbot, _history
-
-        if responses:
-            _history.extend([res for res in responses if res[CONTENT] != PENDING_USER_INPUT])
-
-        if _agent_selector is not None:
-            yield _chatbot, _history, _agent_selector
-        else:
-            yield _chatbot, _history
-
-        if self.verbose:
-            logger.info('agent_run response:\n' + pprint.pformat(responses, indent=2))
-
-    def flushed(self):
-        from qwen_agent.gui.gradio_dep import gr
-
-        return gr.update(interactive=True)
-
-    def _get_agent_index_by_name(self, agent_name):
-        if agent_name is None:
-            return 0
-
+def stop_static_server():
+    """停止静态文件服务器"""
+    global static_server_process
+    if static_server_process and static_server_process.poll() is None:  # 检查是否仍在运行
+        print("[INFO] Stopping static file server...")
         try:
-            agent_name = agent_name.strip()
-            for i, agent in enumerate(self.agent_list):
-                if agent.name == agent_name:
-                    return i
-            return 0
-        except Exception:
-            print_traceback()
-            return 0
+            static_server_process.terminate()
+            static_server_process.wait(timeout=5)  # 等待最多5秒
+            print("[INFO] Static file server stopped.")
+        except subprocess.TimeoutExpired:
+            print("[WARNING] Static server did not terminate in time, killing it...")
+            static_server_process.kill()
+            static_server_process.wait()
+            print("[INFO] Static file server killed.")
+        except Exception as e:
+            print(f"[ERROR] Error stopping static server: {e}")
+    elif static_server_process:
+        print(f"[INFO] Static file server (PID: {static_server_process.pid}) had already exited.")
 
-    def _create_agent_info_block(self, agent_index=0):
-        from qwen_agent.gui.gradio_dep import gr
 
-        agent_config_interactive = self.agent_config_list[agent_index]
+if __name__ == "__main__":
+    start_static_server()
 
-        return gr.HTML(
-            format_cover_html(
-                bot_name=agent_config_interactive['name'],
-                bot_description=agent_config_interactive['description'],
-                bot_avatar=agent_config_interactive['avatar'],
-            ))
+    atexit.register(stop_static_server)
 
-    def _create_agent_plugins_block(self, agent_index=0):
-        from qwen_agent.gui.gradio_dep import gr
+    try:
+        demo.queue().launch(share=False)
+    finally:
+        stop_static_server()
 
-        agent_interactive = self.agent_list[agent_index]
-
-        if agent_interactive.function_map:
-            capabilities = [key for key in agent_interactive.function_map.keys()]
-            return gr.CheckboxGroup(
-                label='插件',
-                value=capabilities,
-                choices=capabilities,
-                interactive=False,
-            )
-
-        else:
-            return gr.CheckboxGroup(
-                label='插件',
-                value=[],
-                choices=[],
-                interactive=False,
-            )
