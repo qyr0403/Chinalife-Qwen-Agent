@@ -152,7 +152,6 @@ class VectorSearch(BaseSearch):
         embeddings = ClamcEmbeddings()
         # embeddings = DashScopeEmbeddings(model='text-embedding-v1',
                                         #  dashscope_api_key=os.getenv('DASHSCOPE_API_KEY', ''))
-        all_chunks = all_chunks[:10]
         db = FAISS.from_documents(all_chunks, embeddings)
         chunk_and_score = db.similarity_search_with_score(query, k=50)
         rerank_score = rerank_query(query, texts=[chk[0].page_content for chk in chunk_and_score])
