@@ -105,12 +105,27 @@ class DocParser(BaseTool):
 
         # 如果传入的是文件名或相对路径
         if not url.startswith(('http://', 'https://')) and not os.path.isabs(url):
-            if os.path.exists(url):
-                url = os.path.abspath(url)
-            elif os.path.exists(os.path.join(DEFAULT_WORKSPACE, url)):
-                url = os.path.abspath(os.path.join(DEFAULT_WORKSPACE, url))
-            elif os.path.exists(os.path.join(self.data_root, url)):
-                url = os.path.abspath(os.path.join(self.data_root, url))
+            # 使用系统默认的临时目录
+            import tempfile
+            temp_gradio_dir = os.path.join(tempfile.gettempdir(), 'gradio')
+            # 在Windows上通常会是 C:\Users\用户名\AppData\Local\Temp\gradio
+            # 递归查找文件
+            def find_file_recursive(directory, filename):
+                for root, dirs, files in os.walk(directory):
+                    if filename in files:
+                        return os.path.join(root, filename)
+                return None
+        
+            # 尝试查找文件
+            file_basename = os.path.basename(url)
+            found_path = find_file_recursive(temp_gradio_dir, file_basename)
+            
+            # 如果找到了文件，则更新url为绝对路径
+            if found_path:
+                url = found_path
+                logger.info(f"Found file at: {url}")
+            else:
+                logger.warning(f"File {file_basename} not found in {temp_gradio_dir}")
                 
         cached_name_chunking = f'{hash_sha256(url)}_{str(parser_page_size)}'
         try:
