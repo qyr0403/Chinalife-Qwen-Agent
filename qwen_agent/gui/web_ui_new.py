@@ -145,33 +145,33 @@ DEFAULT_PROMPTS = [{
 
 DEFAULT_SUGGESTIONS = [{
     "label":
-    'Make a plan',
+    "📅 帮我分析",
     "value":
-    "Make a plan",
+    "📅 帮我分析",
     "children": [{
-        "label": "Start a business",
-        "value": "Help me with a plan to start a business"
+        "label": "讲解格力公司最近的增长点",
+        "value": "请讲解一下格力公司最近的增长点"
     }, {
-        "label": "Achieve my goals",
-        "value": "Help me with a plan to achieve my goals"
+        "label": "解读本季度财报",
+        "value": "请解读本季度财报"
     }, {
-        "label": "Successful interview",
-        "value": "Help me with a plan for a successful interview"
+        "label": "分析量子计算机发展路线",
+        "value": "帮我分析下量子计算机发展的路线，并画一张折线图。"
     }]
 }, {
     "label":
-    'Help me write',
+    "🖋 帮我可视化",
     "value":
-    "Help me write",
+    "🖋 帮我可视化",
     "children": [{
-        "label": "Story with a twist ending",
-        "value": "Help me write a story with a twist ending"
+        "label": "可视化附件文档数据",
+        "value": "帮我可视化附件文档数据"
     }, {
-        "label": "Blog post on mental health",
-        "value": "Help me write a blog post on mental health"
+        "label": "可视化盈利波动",
+        "value": "帮我可视化盈利波动"
     }, {
-        "label": "Letter to my future self",
-        "value": "Help me write a letter to my future self"
+        "label": "可视化数据",
+        "value": "帮我可视化数据"
     }]
 }]
 
@@ -189,8 +189,8 @@ def user_config(disabled_actions=None):
         "copy", "edit",
         ChatbotActionConfig(
             action="delete",
-            popconfirm=dict(title="Delete the message",
-                            description="Are you sure to delete this message?",
+            popconfirm=dict(title="删除",
+                            description="你确定要删除吗?",
                             okButtonProps=dict(danger=True)))
     ],
                              disabled_actions=disabled_actions)
@@ -203,19 +203,19 @@ def bot_config(disabled_actions=None):
             ChatbotActionConfig(
                 action="retry",
                 popconfirm=dict(
-                    title="Regenerate the message",
+                    title="重新生成",
                     description=
-                    "Regenerate the message will also delete all subsequent messages.",
+                    "重新生成将删除原有的后续信息",
                     okButtonProps=dict(danger=True))),
             ChatbotActionConfig(action="delete",
                                 popconfirm=dict(
-                                    title="Delete the message",
+                                    title="删除",
                                     description=
-                                    "Are you sure to delete this message?",
+                                    "你确定要删除吗?",
                                     okButtonProps=dict(danger=True)))
         ],
         avatar=
-        "https://assets.alicdn.com/g/qwenweb/qwen-webui-fe/0.0.44/static/favicon.png",
+        r"D:\PROJECT\Chinalife-Qwen-Agent\qwen_agent\gui\assets\fmt.png",
         disabled_actions=disabled_actions)
 
 
@@ -571,12 +571,12 @@ def logo():
                                                margin=0)):
         with antd.Flex(align="center", gap="small", justify="center"):
             antd.Image(
-                r"D:\PROJECT\Chinalife-Qwen-Agent\qwen_agent\gui\assets\logo.jpeg",
+                r"D:\PROJECT\Chinalife-Qwen-Agent\qwen_agent\gui\assets\logo_china_life.jpeg",
                 preview=False,
                 alt="logo",
                 width=24,
                 height=24)
-            ms.Span("Chatbot")
+            ms.Span("中国人寿")
 
 
 with gr.Blocks(css=css, fill_width=True) as demo:
@@ -606,7 +606,7 @@ with gr.Blocks(css=css, fill_width=True) as demo:
                                      color="primary",
                                      variant="filled",
                                      block=True) as add_conversation_btn:
-                        ms.Text("New Conversation")
+                        ms.Text("新对话")
                         with ms.Slot("icon"):
                             antd.Icon("PlusOutlined")
 
@@ -629,12 +629,12 @@ with gr.Blocks(css=css, fill_width=True) as demo:
                         welcome_config=ChatbotWelcomeConfig(
                             variant="borderless",
                             icon=
-                            "https://mdn.alipayobjects.com/huamei_iwk9zp/afts/img/A*s5sNRo5LjfQAAAAAAAAAAAAADgCCAQ/fmt.webp",
+                            r"D:\PROJECT\Chinalife-Qwen-Agent\qwen_agent\gui\assets\fmt.png",
                             title=f"你好，我是CLAMC-Agent",
                             description=
                             "我是大语言模型驱动的智能投研助手，你可以上传文件开始进行使用~",
                             prompts=dict(
-                                title="How can I help you today?",
+                                title="今天能为你做些什么呢?",
                                 styles={
                                     "list": {
                                         "width": '100%',
@@ -649,7 +649,7 @@ with gr.Blocks(css=css, fill_width=True) as demo:
                         bot_config=bot_config())
                     # Input
                     with antdx.Suggestion(
-                            items=DEFAULT_PROMPTS,
+                            items=DEFAULT_SUGGESTIONS,
                             # onKeyDown Handler in Javascript
                             should_trigger="""(e, { onTrigger, onKeyDown }) => {
                       switch(e.key) {
@@ -668,17 +668,17 @@ with gr.Blocks(css=css, fill_width=True) as demo:
                     }""") as suggestion:
                         with ms.Slot("children"):
                             with pro.MultimodalInput(
-                                    placeholder="Enter / to get suggestions",
+                                    placeholder="输入 / 获取建议",
                                     upload_config=MultimodalInputUploadConfig(
                                         upload_button_tooltip=
-                                        "Upload Attachments",
+                                        "上传附件",
                                         max_count=6,
                                         # accept="image/*",
                                         multiple=True)) as input:
                                 with ms.Slot("prefix"):
                                     # Clear Button
                                     with antd.Tooltip(
-                                            title="Clear Conversation History"
+                                            title="清除对话历史"
                                     ):
                                         with antd.Button(
                                                 value=None,
